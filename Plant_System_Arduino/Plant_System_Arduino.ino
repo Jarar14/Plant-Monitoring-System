@@ -1,5 +1,6 @@
 /*
  * For Plant Health Monitoring System
+ * Team 1
  */
 
 #include <WiFi.h>

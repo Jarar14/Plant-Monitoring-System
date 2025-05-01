@@ -1,4 +1,4 @@
-/*
+ /*
  * For Plant Health Monitoring System
  * Team 1 - Fixed MPU6050 Connection
  */
@@ -28,6 +28,11 @@ int soilsensorValue;
 #define bluePin   2
 #define greenPin  18
 
+// Light Sensor
+#define lightSensorPin 34   // Analog pin for LDR
+#define greenLEDPin 25      // Green LED
+int lightLevel = 0;
+
 // WiFi credentials
 const char* ssid = "YOUR_WIFI_SSID";
 const char* password = "YOUR_WIFI_PASSWORD";
@@ -39,14 +44,13 @@ const char* serverUrl = "http://your-server-url.com/api/plant-data";
 void setupWiFi();
 
 void setup() {
-  Serial.begin(115200);  // Increased baud rate for better debugging
+  Serial.begin(115200);
   delay(1000);  // Give serial monitor time to start
+  Serial.println("Plant Health Monitoring System Starting...");
 
   pinMode(GAS_PIN, INPUT);
   
-  Serial.println("Plant Health Monitoring System Starting...");
-  
-  // Initialize MPU6050 I2C connection with proper settings
+  // Initialize MPU6050 I2C connection
   Wire.begin(SDA_PIN, SCL_PIN);
   
   // Enable internal pull-up resistors
@@ -70,6 +74,11 @@ void setup() {
   digitalWrite(greenPin, HIGH);
   digitalWrite(redPin, LOW);
   digitalWrite(bluePin, LOW);
+
+  // Light sensor setup
+  pinMode(lightSensorPin, INPUT);
+  pinMode(greenLEDPin, OUTPUT);
+  digitalWrite(greenLEDPin, LOW);
 }
 
 // Initialize the MPU6050
@@ -86,7 +95,7 @@ bool initMPU6050() {
     return false;
   }
   
-  // Wake up the MPU6050 - essential step!
+  // Wake up the MPU6050 (Essential)
   Wire.beginTransmission(MPU_ADDR);
   Wire.write(MPU_PWR_MGMT_1);  // Power Management register
   Wire.write(0);               // Set to zero to wake up
@@ -106,7 +115,7 @@ bool initMPU6050() {
 bool readAccelerometer() {
   // Send request to read accelerometer data
   Wire.beginTransmission(MPU_ADDR);
-  Wire.write(MPU_ACCEL_XOUT_H);  // Register to start reading from
+  Wire.write(MPU_ACCEL_XOUT_H);  // Register to start reading
   byte error = Wire.endTransmission(false);
   
   if (error != 0) {
@@ -124,7 +133,7 @@ bool readAccelerometer() {
     accelY = Wire.read() << 8 | Wire.read();
     accelZ = Wire.read() << 8 | Wire.read();
     
-    // Convert to g forces (±2g range by default)
+    // Convert to g forces (+-2g range by default)
     float aX = accelX / 16384.0;
     float aY = accelY / 16384.0;
     float aZ = accelZ / 16384.0;
@@ -147,15 +156,39 @@ bool readAccelerometer() {
   }
 }
 
+// Read Light Sensor
+void readLightSensor() {
+  int rawValue = analogRead(lightSensorPin);
+  lightLevel = map(rawValue, 0, 4095, 0, 100);  // Mapping to percentage (0 = low light, 100 = max light)
+
+  //Serial.print("Raw Light Value: ");
+  //Serial.print(rawValue);
+  Serial.print(" => Light Level (%): ");
+  Serial.println(lightLevel);
+}
+
+// Determine Plant Light Condition
+void processLightData() {
+  if (lightLevel < 30) {
+    digitalWrite(greenLEDPin, LOW);   // Green LED OFF
+    Serial.println("Low Light Detected!");
+  } else {
+    digitalWrite(greenLEDPin, HIGH);  // Green LED ON
+    Serial.println("Normal Light");
+  }
+}
+
 void loop() {
-  
+
+  readLightSensor();
+  processLightData();
+
   int airValue = analogRead(GAS_PIN);
   int humidityValue = analogRead(HUMIDITY_PIN);
-  Serial.print("AirQuality Value: ");
+  Serial.print("Air Quality Value: ");
   Serial.println(airValue, DEC);
   Serial.print("Soil Humidity Value: ");
   Serial.println(humidityValue, DEC);
-  delay(1000);
   
   // Attempt to read accelerometer data
   bool readSuccess = readAccelerometer();
@@ -169,5 +202,5 @@ void loop() {
   Serial.println(isPlantTilted ? "YES" : "NO");
   
   // Wait before next reading
-  delay(1000);
+  delay(2000);
 }

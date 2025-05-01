@@ -9,20 +9,24 @@
 #include <Wire.h>
 
 // MPU6050 Gyroscope
-#define SDA_PIN 21
-#define SCL_PIN 22
-#define MPU_ADDR 0x68  // AD0 pin connected to GND
-#define MPU_PWR_MGMT_1 0x6B
+#define SDA_PIN   21
+#define SCL_PIN   22
+#define MPU_ADDR  0x68  // AD0 pin connected to GND
+#define MPU_PWR_MGMT_1   0x6B
 #define MPU_ACCEL_XOUT_H 0x3B
-
-// Other sensor variables
 int16_t accelX, accelY, accelZ;
 bool isPlantTilted = false;
 
+// Air Quality + Humidity
+int sensorValue;
+int soilsensorValue;
+#define GAS_PIN       2
+#define HUMIDITY_PIN  4
+
 // LED pins
-int redPin = 16;
-int bluePin = 2;
-int greenPin = 18;
+#define redPin    16
+#define bluePin   2
+#define greenPin  18
 
 // WiFi credentials
 const char* ssid = "YOUR_WIFI_SSID";
@@ -37,6 +41,8 @@ void setupWiFi();
 void setup() {
   Serial.begin(115200);  // Increased baud rate for better debugging
   delay(1000);  // Give serial monitor time to start
+
+  pinMode(GAS_PIN, INPUT);
   
   Serial.println("Plant Health Monitoring System Starting...");
   
@@ -66,7 +72,7 @@ void setup() {
   digitalWrite(bluePin, LOW);
 }
 
-// New function to properly initialize the MPU6050
+// Initialize the MPU6050
 bool initMPU6050() {
   Wire.begin(SDA_PIN, SCL_PIN);
   
@@ -123,14 +129,16 @@ bool readAccelerometer() {
     float aY = accelY / 16384.0;
     float aZ = accelZ / 16384.0;
     
+    /*
     // Debug output
     Serial.print("Accel X: "); Serial.print(aX, 2);
     Serial.print(" | Y: "); Serial.print(aY, 2);
     Serial.print(" | Z: "); Serial.println(aZ, 2);
+    */
     
     // Calculate tilt
     float tiltMagnitude = sqrt(aX*aX + aY*aY);
-    isPlantTilted = (tiltMagnitude > 0.2);
+    isPlantTilted = (tiltMagnitude > 0.3);
     
     return true;
   } else {
@@ -139,61 +147,18 @@ bool readAccelerometer() {
   }
 }
 
-// I2C Scanner to help diagnose connection issues
-void scanI2CDevices() {
-  byte error, address;
-  int deviceCount = 0;
-  
-  Serial.println("Scanning for I2C devices...");
-  
-  for (address = 1; address < 127; address++) {
-    Wire.beginTransmission(address);
-    error = Wire.endTransmission();
-    
-    if (error == 0) {
-      Serial.print("I2C device found at address 0x");
-      if (address < 16) Serial.print("0");
-      Serial.print(address, HEX);
-      Serial.println(" !");
-      deviceCount++;
-      
-      if (address == MPU_ADDR) {
-        Serial.println("MPU6050 found at expected address!");
-      }
-    } else if (error == 4) {
-      Serial.print("Unknown error at address 0x");
-      if (address < 16) Serial.print("0");
-      Serial.println(address, HEX);
-    }
-  }
-  
-  if (deviceCount == 0) {
-    Serial.println("No I2C devices found! Check your connections.");
-  } else {
-    Serial.print("Found ");
-    Serial.print(deviceCount);
-    Serial.println(" device(s).");
-  }
-}
-
 void loop() {
-  // Scan I2C devices on first run or periodically to help with debugging
-  //remove if sensors running consistently
-  static bool firstRun = true;
-  if (firstRun) {
-    scanI2CDevices();
-    firstRun = false;
-  }
+  
+  int airValue = analogRead(GAS_PIN);
+  int humidityValue = analogRead(HUMIDITY_PIN);
+  Serial.print("AirQuality Value: ");
+  Serial.println(airValue, DEC);
+  Serial.print("Soil Humidity Value: ");
+  Serial.println(humidityValue, DEC);
+  delay(1000);
   
   // Attempt to read accelerometer data
   bool readSuccess = readAccelerometer();
-  
-  // Visual indicator - blink blue LED on successful read
-  if (readSuccess) {
-    digitalWrite(bluePin, HIGH);
-  } else {
-    digitalWrite(redPin, HIGH);  // Red LED for errors
-  }
   
   delay(100);
   digitalWrite(bluePin, LOW);

@@ -7,6 +7,9 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include <Wire.h>
+#include <WiFiUdp.h>
+#include <NTPClient.h>
+#include <Arduino_JSON.h>
 
 // MPU6050 Gyroscope
 #define SDA_PIN   21
@@ -47,7 +50,6 @@ void setup() {
   Serial.begin(115200);
   delay(1000);  // Give serial monitor time to start
   Serial.println("Plant Health Monitoring System Starting...");
-
   pinMode(GAS_PIN, INPUT);
   
   // Initialize MPU6050 I2C connection
@@ -176,9 +178,16 @@ void processLightData() {
     digitalWrite(greenLEDPin, HIGH);  // Green LED ON
     Serial.println("Normal Light");
   }
+  
 }
 
 void loop() {
+  JSONVar data;
+  WiFi.begin(ssid,password)
+  WiFiClient client;
+  HTTPClient http;
+  http.begin(client, server);
+  http.addHeader("Content-Type", "application/json");
 
   readLightSensor();
   processLightData();
@@ -201,6 +210,16 @@ void loop() {
   Serial.print("Plant tilted: ");
   Serial.println(isPlantTilted ? "YES" : "NO");
   
+  data["team_number"] = 1;
+  data["Light Level"] = lightLevel;
+  data["Air Quality"] = airValue;
+  data["Soil Humidity"] = humidityValue;
+
+  msg = JSON.stringify(encryptedData);
+
+  int responseCode = http.POST(msg);
+  Serial.println(msg);
+
   // Wait before next reading
   delay(2000);
 }

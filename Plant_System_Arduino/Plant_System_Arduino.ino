@@ -18,7 +18,7 @@
 #define MPU_ACCEL_XOUT_H 0x3B
 int16_t accelX, accelY, accelZ;
 bool isPlantTilted = false;
-int tiltMagnitude;
+float tiltMagnitude;
 
 // Air Quality + Humidity
 int sensorValue;
@@ -75,9 +75,9 @@ void setup() {
   pinMode(bluePin, OUTPUT);
   pinMode(greenPin, OUTPUT);
   
-  digitalWrite(greenPin, LOW);
-  digitalWrite(redPin, LOW);
-  digitalWrite(bluePin, LOW);
+  digitalWrite(greenPin, 1);
+  digitalWrite(redPin, 1);
+  digitalWrite(bluePin, 1);
 
   // Light sensor setup
   pinMode(lightSensorPin, INPUT);
@@ -114,7 +114,7 @@ bool initMPU6050() {
 }
 
 // Improved function to read data from the accelerometer
-int readAccelerometer() {
+float readAccelerometer() {
   // Send request to read accelerometer data
   Wire.beginTransmission(MPU_ADDR);
   Wire.write(MPU_ACCEL_XOUT_H);  // Register to start reading
@@ -153,7 +153,7 @@ int readAccelerometer() {
     return tiltMagnitude;
   } else {
     Serial.println("Failed to read all accelerometer data!");
-    return 0;
+    return tiltMagnitude;
   }
 }
 
@@ -172,9 +172,9 @@ int readLightSensor() {
 
 void determineLED(int humidityValue, int airValue, int lightValue, bool isPlantTilted) {
   // First turn off all LEDs to start with a clean state
-  digitalWrite(redPin, LOW);
-  digitalWrite(bluePin, LOW);
-  digitalWrite(greenPin, LOW);
+  digitalWrite(redPin, 1);
+  digitalWrite(bluePin, 1);
+  digitalWrite(greenPin, 1);
   
   // Static variables for toggling
   static int  tiltColorState = 0;
@@ -188,33 +188,33 @@ void determineLED(int humidityValue, int airValue, int lightValue, bool isPlantT
     tiltColorState = (tiltColorState + 1) % 3;
     
     if (tiltColorState == 0) {
-      digitalWrite(redPin, HIGH);
+      digitalWrite(redPin, 0);
     } 
     else if (tiltColorState == 1) {
-      digitalWrite(bluePin, HIGH);
+      digitalWrite(bluePin, 0);
     }
     else {
-      digitalWrite(greenPin, HIGH);
+      digitalWrite(greenPin, 0);
     }
     Serial.println("Plant Knocked Over!");
   }
-  else if (lightValue < 60 && humidityValue < 30) {
+  else if (lightValue < 75 && humidityValue < 30) {
     // Alternate Red and Blue for low light & humidity
     toggleRedBlue = !toggleRedBlue;
     
     if (toggleRedBlue) {
-      digitalWrite(redPin, HIGH);
+      digitalWrite(redPin, 0);
     } else {
-      digitalWrite(bluePin, HIGH);
+      digitalWrite(bluePin, 0);
     }
     Serial.println("Low Light & Humidity!");
   }
-  else if (lightValue < 60) {
+  else if (lightValue < 75) {
     // Toggle Blue for low light
     toggleBlue = !toggleBlue;
     digitalWrite(bluePin, toggleBlue);
-    digitalWrite(redPin, LOW);
-    digitalWrite(greenPin, LOW);
+    digitalWrite(redPin, 1);
+    digitalWrite(greenPin, 1);
 
     Serial.println("Low Light!");
   }
@@ -222,13 +222,16 @@ void determineLED(int humidityValue, int airValue, int lightValue, bool isPlantT
     // Toggle ONLY Red for low humidity
     toggleRed = !toggleRed;
     digitalWrite(redPin, toggleRed);
+    digitalWrite(greenPin, 1);
+    digitalWrite(bluePin, 1);
     Serial.println("Low Humidity!");
   }
   else if (airValue > 800) {
     // Purple for bad air (red + blue)
-    digitalWrite(redPin, HIGH);
-    digitalWrite(bluePin, HIGH);
-    Serial.println("Bad Air!");
+    digitalWrite(redPin, 0);
+    digitalWrite(bluePin, 0);
+    digitalWrite(greenPin, 1);
+    Serial.println("Bad Air Quality!");
   }
   else {
     Serial.println("ALL GOOD!");
@@ -246,13 +249,16 @@ void loop() {
   Serial.print("Soil Humidity Value: ");
   Serial.println(humidityValue, DEC);
   
+  // Attempt to read accelerometer data
+  tiltMagnitude = readAccelerometer();
+  isPlantTilted = (tiltMagnitude > 0.8);
+  Serial.println(tiltMagnitude);
+
   // Process plant tilt status
   Serial.print("Plant tilted: ");
   Serial.println(isPlantTilted ? "YES" : "NO"); 
 
-  // Attempt to read accelerometer data
-  tiltMagnitude = readAccelerometer();
-  isPlantTilted = (tiltMagnitude > 0.3);
+
 
   determineLED(humidityValue, airValue, lightValue, isPlantTilted);
 
@@ -262,10 +268,10 @@ void loop() {
   HTTPClient http;
   http.begin(client, serverUrl);
   http.addHeader("Content-Type", "application/json");
-
-  data["light"] = lightLevel;
+  
   data["air"] = airValue;
   data["soil"] = humidityValue;
+  data["light"] = lightLevel;
   data["tilt"] = tiltMagnitude;
   data["knocked"] = isPlantTilted;
 
@@ -274,5 +280,5 @@ void loop() {
   Serial.println(msg);
   
   // Wait before next reading
-  delay(2000);
+  delay(1000);
 }

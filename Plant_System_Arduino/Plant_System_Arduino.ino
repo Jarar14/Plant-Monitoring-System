@@ -9,6 +9,13 @@
 #include <WiFiUdp.h>
 #include <NTPClient.h>
 #include <Arduino_JSON.h>
+#include <Crypto.h>
+#include <AES.h>
+
+// Encryption
+byte key[16]={0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F};
+byte cipher[80];
+AES128 aes128;
 
 // MPU6050 Gyroscope
 #define SDA_PIN   21
@@ -55,6 +62,9 @@ void setup() {
 
   pinMode(GAS_PIN, INPUT);
   
+  // Encryption setup
+  aes128.setKey(key,16);
+
   // Initialize MPU6050 I2C connection
   Wire.begin(SDA_PIN, SCL_PIN);
   
@@ -264,6 +274,7 @@ void loop() {
 
   //JSON Packet Setup
   JSONVar data;
+  JSONVar encryptedData;
   WiFiClient client;
   HTTPClient http;
   http.begin(client, serverUrl);
@@ -276,6 +287,31 @@ void loop() {
   data["knocked"] = isPlantTilted;
 
   String msg = JSON.stringify(data);
+
+  // copy JSON message to plaintext buffer for encryption
+  byte plaintext[msg.length()];
+  for(int i = 0; i < msg.length(); i++){
+    plaintext[i] = msg[i];
+  }
+
+  // Encrypt all blocks
+  aes128.encryptBlock(cipher,plaintext);
+  aes128.encryptBlock(&cipher[16],&plaintext[16]);
+  aes128.encryptBlock(&cipher[32],&plaintext[32]);
+  aes128.encryptBlock(&cipher[48],&plaintext[48]);
+  aes128.encryptBlock(&cipher[64],&plaintext[64]);
+
+  // Create ciphertext String to be sent in JSON
+  String bytestream;
+  for(int j = 0; j < sizeof(cipher); j++){
+    bytestream += cipher[j];
+    bytestream+= " ";
+  }
+
+  // Load encrypted JSON
+  encryptedData["cipher"] = bytestream;
+  msg = JSON.stringify(encryptedData);
+
   int responseCode = http.POST(msg);
   Serial.println(msg);
   

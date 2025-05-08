@@ -123,7 +123,7 @@ bool initMPU6050() {
   return true;
 }
 
-// Improved function to read data from the accelerometer
+// Function to read data from the accelerometer
 float readAccelerometer() {
   // Send request to read accelerometer data
   Wire.beginTransmission(MPU_ADDR);
@@ -150,13 +150,6 @@ float readAccelerometer() {
     float aY = accelY / 16384.0;
     float aZ = accelZ / 16384.0;
     
-    /*
-    // Debug output
-    Serial.print("Accel X: "); Serial.print(aX, 2);
-    Serial.print(" | Y: "); Serial.print(aY, 2);
-    Serial.print(" | Z: "); Serial.println(aZ, 2);
-    */
-    
     // Calculate tilt
     float tiltMagnitude = sqrt(aX*aX + aY*aY);
     
@@ -172,8 +165,6 @@ int readLightSensor() {
   int rawValue = analogRead(lightSensorPin);
   lightLevel = 100 - map(rawValue, 0, 4095, 0, 100);  // Mapping to percentage (0 = low light, 100 = max light)
 
-  //Serial.print("Raw Light Value: ");
-  //Serial.print(rawValue);
   Serial.print(" => Light Level (%): ");
   Serial.println(lightLevel);
 
@@ -236,7 +227,7 @@ void determineLED(int humidityValue, int airValue, int lightValue, bool isPlantT
     digitalWrite(bluePin, 1);
     Serial.println("Low Humidity!");
   }
-  else if (airValue > 800) {
+  else if (airValue > 3000) {
     // Purple for bad air (red + blue)
     digitalWrite(redPin, 0);
     digitalWrite(bluePin, 0);
@@ -268,8 +259,7 @@ void loop() {
   Serial.print("Plant tilted: ");
   Serial.println(isPlantTilted ? "YES" : "NO"); 
 
-
-
+  //LED state determination
   determineLED(humidityValue, airValue, lightValue, isPlantTilted);
 
   //JSON Packet Setup
